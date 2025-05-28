@@ -25,28 +25,30 @@
 ## 📦 نصب و راه‌اندازی
 
 ### پیش‌نیازها
-- PHP >= 8.1
+- PHP >= 8.2
 - Composer
-- MySQL/SQLite
+- MySQL
 - Git
 
 ### مراحل نصب
 
+<div dir="ltr">
+
 ```bash
-# کلون کردن پروژه
+# Clone the project
 git clone https://github.com/alireza0xAhmadi/gold-trading-system
 cd gold-trading-system
 
-# نصب dependencies
+# Install dependencies
 composer install
 
-# کپی فایل environment
+# Copy environment file
 cp .env.example .env
 
-# تولید App Key
+# Generate App Key
 php artisan key:generate
 
-# تنظیم دیتابیس در .env
+# Configure database in .env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -54,28 +56,34 @@ DB_DATABASE=gold_trading
 DB_USERNAME=your_username
 DB_PASSWORD=your_password
 
-# اجرای migrations
+# Run migrations
 php artisan migrate
 
-# اجرای seeders (اختیاری)
+# Run seeders (optional)
 php artisan db:seed
 
-# شروع سرور
+# Start the server
 php artisan serve
 ```
 
+</div>
+
 ## 🧪 اجرای تست‌ها
 
+<div dir="ltr">
+
 ```bash
-# اجرای تمام تست‌ها
+# Run all tests
 php artisan test
 
-# اجرای تست‌های خاص
+# Run specific tests
 php artisan test tests/Feature/TradingScenarioTest.php
 
-# اجرای تست‌ها با جزئیات
+# Run tests with detailed output
 php artisan test --verbose
 ```
+
+</div>
 
 ## 📚 مستندات API
 
@@ -164,29 +172,33 @@ GET /transactions/user/{userId}
 
 ## 🏗 ساختار پروژه
 
+<div dir="ltr">
+
 ```
 app/
 ├── Http/Controllers/Api/
-│   ├── OrderController.php          # کنترلر سفارشات
-│   └── TransactionController.php    # کنترلر معاملات
+│   ├── OrderController.php          # Order Controller
+│   └── TransactionController.php    # Transaction Controller
 ├── Models/
-│   ├── User.php                     # مدل کاربر
-│   ├── Order.php                    # مدل سفارش
-│   └── Transaction.php              # مدل معامله
+│   ├── User.php                     # User Model
+│   ├── Order.php                    # Order Model
+│   └── Transaction.php              # Transaction Model
 ├── Repositories/
-│   ├── Interfaces/                  # اینترفیس‌های Repository
-│   ├── OrderRepository.php          # Repository سفارشات
-│   └── TransactionRepository.php    # Repository معاملات
+│   ├── Interfaces/                  # Repository Interfaces
+│   ├── OrderRepository.php          # Order Repository
+│   └── TransactionRepository.php    # Transaction Repository
 ├── Services/
-│   ├── TradingService.php           # سرویس اصلی معاملات
-│   └── CommissionService.php        # سرویس محاسبه کارمزد
+│   ├── TradingService.php           # Main Trading Service
+│   └── CommissionService.php        # Commission Calculation Service
 └── Providers/
-    └── RepositoryServiceProvider.php # تزریق وابستگی
+    └── RepositoryServiceProvider.php # Dependency Injection
 
 tests/Feature/
-├── TradingScenarioTest.php          # تست سناریوهای اصلی
-└── TradingEdgeCasesTest.php         # تست حالات خاص
+├── TradingScenarioTest.php          # Main Trading Scenarios Test
+└── TradingEdgeCasesTest.php         # Edge Cases Test
 ```
+
+</div>
 
 ## 📊 مثال سناریو معاملاتی
 
@@ -208,16 +220,16 @@ tests/Feature/
 ## 🧪 تست‌های موجود
 
 ### TradingScenarioTest
-- ✅ سناریو کامل معاملاتی
-- ✅ محاسبه صحیح کارمزد
-- ✅ تاریخچه معاملات
-- ✅ تکمیل جزئی سفارش
+- ✅ Complete trading scenario
+- ✅ Correct commission calculation
+- ✅ Transaction history
+- ✅ Partial order completion
 
 ### TradingEdgeCasesTest
-- ✅ اجرای ترتیبی سفارشات
-- ✅ سناریوهای پیچیده چند مرحله‌ای
-- ✅ دقت محاسبه کارمزد
-- ✅ مدیریت حالات خاص
+- ✅ Sequential order execution
+- ✅ Complex multi-stage scenarios
+- ✅ Commission calculation precision
+- ✅ Special case handling
 
 ## 🚀 ویژگی‌های آتی
 
@@ -242,9 +254,9 @@ tests/Feature/
 
 ## 👨‍💻 توسعه‌دهنده
 
-**نام شما**
-- GitHub: [@your-username](https://github.com/your-username)
-- Email: your-email@example.com
+**علیرضا احمدی**
+- GitHub: [@alireza0xAhmadi](https://github.com/alireza0xAhmadi)
+- Email: blackhat1520@gmail.com
 
 ---
 
