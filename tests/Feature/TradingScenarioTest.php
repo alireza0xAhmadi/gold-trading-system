@@ -1,13 +1,14 @@
 <?php
 
+// tests/Feature/TradingScenarioTest.php
 namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Order;
 use App\Models\Transaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 class TradingScenarioTest extends TestCase
 {
@@ -48,11 +49,8 @@ class TradingScenarioTest extends TestCase
         $this->pricePerGram = 100000000;
     }
 
-    /**
-     * @test
-     * Complete trading scenario test
-     */
-    public function test_complete_trading_scenario()
+    #[Test]
+    public function complete_trading_scenario()
     {
         // Step 1: Ahmad places buy order for 2 grams at 10,000,000 Toman per gram
         $ahmadOrderResponse = $this->postJson('/api/v1/orders/buy', [
@@ -172,8 +170,12 @@ class TradingScenarioTest extends TestCase
         // Reza's Rial balance should remain the same (already deducted when placing order)
         $this->assertEquals(800000000000 - (5.0 * $this->pricePerGram), $this->reza->rial_balance);
 
-        // Akbar should have lost 7g gold (2g + 5g sold)
-        $this->assertEquals($akbarInitialGoldBalance - 7.0, $this->akbar->gold_balance); // 15 - 7 = 8g
+        // CORRECTED: Akbar's gold balance logic
+        // Initial: 15g
+        // Order placed: 10g reserved (deducted immediately) → balance becomes 5g
+        // Trading: 7g sold (no additional deduction, already reserved)
+        // Current balance: 5g (15 - 10 = 5g)
+        $this->assertEquals($akbarInitialGoldBalance - 10.0, $this->akbar->gold_balance); // 15 - 10 = 5g
 
         // Akbar should have received payment for 7g minus commissions
         $totalSoldAmount = 7.0 * $this->pricePerGram; // 700,000,000 Rial
@@ -201,9 +203,11 @@ class TradingScenarioTest extends TestCase
         $cancelResponse->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        // Verify Akbar's remaining gold was refunded
+        // CORRECTED: Verify Akbar's remaining gold was refunded
+        // Before cancel: 5g (15 - 10)
+        // After cancel: 5g + 3g (refund) = 8g
         $this->akbar->refresh();
-        $this->assertEquals($akbarInitialGoldBalance - 7.0 + 3.0, $this->akbar->gold_balance); // 15 - 7 + 3 = 11g
+        $this->assertEquals(8.0, $this->akbar->gold_balance); // 15 - 10 + 3 = 8g (CORRECT)
 
         // Verify order status changed to cancelled
         $akbarOrder->refresh();
@@ -215,11 +219,8 @@ class TradingScenarioTest extends TestCase
         $this->assertCount(0, $activeSellOrders->json());
     }
 
-    /**
-     * @test
-     * Test commission calculation in the scenario
-     */
-    public function test_commission_calculation_in_scenario()
+    #[Test]
+    public function commission_calculation_in_scenario()
     {
         // Place orders as in main scenario
         $this->postJson('/api/v1/orders/buy', [
@@ -244,6 +245,7 @@ class TradingScenarioTest extends TestCase
 
         foreach ($transactions as $transaction) {
             $quantity = $transaction->quantity;
+            $totalAmount = $transaction->total_amount;
 
             // Calculate expected commission based on quantity
             if ($quantity <= 1) {
@@ -255,7 +257,7 @@ class TradingScenarioTest extends TestCase
             }
 
             $expectedCommission = max(
-                $quantity * $expectedRate * $transaction->price_per_gram,
+                $totalAmount * $expectedRate, // CORRECTED: Based on total amount
                 500000 // Minimum commission: 50,000 Toman = 500,000 Rial
             );
 
@@ -265,111 +267,135 @@ class TradingScenarioTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     * Test user transaction history after scenario
-     */
-    public function test_user_transaction_history()
+    #[Test]
+    public function user_transaction_history()
     {
-        // Execute the main scenario
-        $this->test_complete_trading_scenario();
+        // Create separate users for this test to avoid interference
+        $testAhmad = User::create([
+            'name' => 'Test Ahmad',
+            'email' => 'test_ahmad@test.com',
+            'gold_balance' => 0.0,
+            'rial_balance' => 500000000000,
+        ]);
+
+        $testReza = User::create([
+            'name' => 'Test Reza',
+            'email' => 'test_reza@test.com',
+            'gold_balance' => 0.0,
+            'rial_balance' => 800000000000,
+        ]);
+
+        $testAkbar = User::create([
+            'name' => 'Test Akbar',
+            'email' => 'test_akbar@test.com',
+            'gold_balance' => 15.0,
+            'rial_balance' => 100000000,
+        ]);
+
+        // Execute a mini trading scenario
+        $this->postJson('/api/v1/orders/buy', [
+            'user_id' => $testAhmad->id,
+            'quantity' => 2.0,
+            'price_per_gram' => $this->pricePerGram,
+        ]);
+
+        $this->postJson('/api/v1/orders/buy', [
+            'user_id' => $testReza->id,
+            'quantity' => 3.0,
+            'price_per_gram' => $this->pricePerGram,
+        ]);
+
+        $this->postJson('/api/v1/orders/sell', [
+            'user_id' => $testAkbar->id,
+            'quantity' => 8.0,
+            'price_per_gram' => $this->pricePerGram,
+        ]);
 
         // Test Ahmad's transaction history
-        $ahmadHistory = $this->getJson("/api/v1/transactions/user/{$this->ahmad->id}");
+        $ahmadHistory = $this->getJson("/api/v1/transactions/user/{$testAhmad->id}");
         $ahmadHistory->assertStatus(200);
         $ahmadTransactions = $ahmadHistory->json();
 
         $this->assertCount(1, $ahmadTransactions);
-        $this->assertEquals($this->ahmad->id, $ahmadTransactions[0]['buyer']['id']);
-        $this->assertEquals($this->akbar->id, $ahmadTransactions[0]['seller']['id']);
+        $this->assertEquals($testAhmad->id, $ahmadTransactions[0]['buyer']['id']);
+        $this->assertEquals($testAkbar->id, $ahmadTransactions[0]['seller']['id']);
         $this->assertEquals(2.0, $ahmadTransactions[0]['quantity']);
 
         // Test Reza's transaction history
-        $rezaHistory = $this->getJson("/api/v1/transactions/user/{$this->reza->id}");
+        $rezaHistory = $this->getJson("/api/v1/transactions/user/{$testReza->id}");
         $rezaHistory->assertStatus(200);
         $rezaTransactions = $rezaHistory->json();
 
         $this->assertCount(1, $rezaTransactions);
-        $this->assertEquals($this->reza->id, $rezaTransactions[0]['buyer']['id']);
-        $this->assertEquals($this->akbar->id, $rezaTransactions[0]['seller']['id']);
-        $this->assertEquals(5.0, $rezaTransactions[0]['quantity']);
+        $this->assertEquals($testReza->id, $rezaTransactions[0]['buyer']['id']);
+        $this->assertEquals($testAkbar->id, $rezaTransactions[0]['seller']['id']);
+        $this->assertEquals(3.0, $rezaTransactions[0]['quantity']);
 
         // Test Akbar's transaction history (should appear in both as seller)
-        $akbarHistory = $this->getJson("/api/v1/transactions/user/{$this->akbar->id}");
+        $akbarHistory = $this->getJson("/api/v1/transactions/user/{$testAkbar->id}");
         $akbarHistory->assertStatus(200);
         $akbarTransactions = $akbarHistory->json();
 
         $this->assertCount(2, $akbarTransactions); // Two transactions as seller
 
         foreach ($akbarTransactions as $transaction) {
-            $this->assertEquals($this->akbar->id, $transaction['seller']['id']);
+            $this->assertEquals($testAkbar->id, $transaction['seller']['id']);
         }
+
+        // CORRECTED: Check Akbar's final gold balance
+        // Initial: 15g, Order: 8g, Sold: 5g (2+3), Remaining order: 3g
+        // Balance: 15 - 8 = 7g (reserved), Final: 7g + 3g = 7g (since 3g is still reserved for active order)
+        $testAkbar->refresh();
+        $this->assertEquals(7.0, $testAkbar->gold_balance); // 15 - 8 = 7g (correct logic)
     }
 
-    /**
-     * @test
-     * Test partial order fulfillment
-     */
-    public function test_partial_order_fulfillment()
+    #[Test]
+    public function partial_order_fulfillment()
     {
-        // Ahmad wants to buy 2g
+        // Create separate users for this test
+        $buyer = User::create([
+            'name' => 'Partial Buyer',
+            'email' => 'partial_buyer@test.com',
+            'gold_balance' => 0.0,
+            'rial_balance' => 500000000000,
+        ]);
+
+        $seller = User::create([
+            'name' => 'Partial Seller',
+            'email' => 'partial_seller@test.com',
+            'gold_balance' => 15.0,
+            'rial_balance' => 100000000,
+        ]);
+
+        // Buyer wants to buy 2g
         $this->postJson('/api/v1/orders/buy', [
-            'user_id' => $this->ahmad->id,
+            'user_id' => $buyer->id,
             'quantity' => 2.0,
             'price_per_gram' => $this->pricePerGram,
         ]);
 
-        // Akbar sells only 1g (partial fulfillment of Ahmad's order)
+        // Seller sells only 1g (partial fulfillment of buyer's order)
         $this->postJson('/api/v1/orders/sell', [
-            'user_id' => $this->akbar->id,
+            'user_id' => $seller->id,
             'quantity' => 1.0,
             'price_per_gram' => $this->pricePerGram,
         ]);
 
-        // Check that Ahmad's order is partially filled
-        $ahmadOrder = Order::where('user_id', $this->ahmad->id)->first();
-        $this->assertEquals('active', $ahmadOrder->status);
-        $this->assertEquals(1.0, $ahmadOrder->remaining_quantity); // 2 - 1 = 1g remaining
+        // Check that buyer's order is partially filled
+        $buyerOrder = Order::where('user_id', $buyer->id)->first();
+        $this->assertEquals('active', $buyerOrder->status);
+        $this->assertEquals(1.0, $buyerOrder->remaining_quantity); // 2 - 1 = 1g remaining
 
-        // Check that Akbar's order is completed
-        $akbarOrder = Order::where('user_id', $this->akbar->id)->first();
-        $this->assertEquals('completed', $akbarOrder->status);
-        $this->assertEquals(0.0, $akbarOrder->remaining_quantity);
+        // Check that seller's order is completed
+        $sellerOrder = Order::where('user_id', $seller->id)->first();
+        $this->assertEquals('completed', $sellerOrder->status);
+        $this->assertEquals(0.0, $sellerOrder->remaining_quantity);
 
         // Verify balances
-        $this->ahmad->refresh();
-        $this->akbar->refresh();
+        $buyer->refresh();
+        $seller->refresh();
 
-        $this->assertEquals(1.0, $this->ahmad->gold_balance); // Received 1g
-        $this->assertEquals(14.0, $this->akbar->gold_balance); // Lost 1g (15 - 1)
-    }
-
-    /**
-     * Helper method to display scenario results
-     */
-    private function displayScenarioResults()
-    {
-        $this->ahmad->refresh();
-        $this->reza->refresh();
-        $this->akbar->refresh();
-
-        echo "\n=== Trading Scenario Results ===\n";
-        echo "Ahmad - Gold: {$this->ahmad->gold_balance}g, Rial: " . ($this->ahmad->rial_balance / 10) . " Toman\n";
-        echo "Reza - Gold: {$this->reza->gold_balance}g, Rial: " . ($this->reza->rial_balance / 10) . " Toman\n";
-        echo "Akbar - Gold: {$this->akbar->gold_balance}g, Rial: " . ($this->akbar->rial_balance / 10) . " Toman\n";
-
-        echo "\nTransactions:\n";
-        $transactions = Transaction::with(['buyer', 'seller'])->get();
-        foreach ($transactions as $transaction) {
-            echo "- {$transaction->buyer->name} bought {$transaction->quantity}g from {$transaction->seller->name} ";
-            echo "at " . ($transaction->price_per_gram / 10) . " Toman per gram\n";
-            echo "  Total: " . ($transaction->total_amount / 10) . " Toman, Commission: " . ($transaction->commission / 10) . " Toman\n";
-        }
-
-        echo "\nActive Orders:\n";
-        $activeOrders = Order::where('status', 'active')->with('user')->get();
-        foreach ($activeOrders as $order) {
-            echo "- {$order->user->name}: {$order->type} {$order->remaining_quantity}g at " . ($order->price_per_gram / 10) . " Toman per gram\n";
-        }
+        $this->assertEquals(1.0, $buyer->gold_balance); // Received 1g
+        $this->assertEquals(14.0, $seller->gold_balance); // Had 15g, reserved 1g, now has 14g (15-1=14)
     }
 }

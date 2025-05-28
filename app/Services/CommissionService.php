@@ -1,15 +1,16 @@
 <?php
+
 namespace App\Services;
 
 class CommissionService
 {
-    const MIN_COMMISSION = 50000; // 50 thousand Toman in Rial
-    const MAX_COMMISSION = 5000000; // 5 million Toman in Rial
+    const MIN_COMMISSION = 500000; // 50,000 Toman = 500,000 Rial
+    const MAX_COMMISSION = 50000000; // 5,000,000 Toman = 50,000,000 Rial
 
-    public function calculateCommission(float $quantity): int
+    public function calculateCommission(float $quantity, int $totalAmount): int
     {
         $rate = $this->getCommissionRate($quantity);
-        $commission = $quantity * $rate * 1000000; // Convert percentage to Rial (assuming average price)
+        $commission = $totalAmount * $rate; // Commission based on total transaction amount
 
         // Apply minimum and maximum limits
         $commission = max($commission, self::MIN_COMMISSION);

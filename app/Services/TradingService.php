@@ -56,7 +56,7 @@ class TradingService
                 throw new \Exception('Insufficient gold balance');
             }
 
-            // Deduct gold balance
+            // Reserve gold by deducting from balance (like we do with Rial for buy orders)
             $user->decrement('gold_balance', $quantity);
 
             // Create order
@@ -90,6 +90,9 @@ class TradingService
 
             if ($tradeQuantity > 0) {
                 $this->executeTrade($newOrder, $existingOrder, $tradeQuantity);
+
+                // Refresh the order to get updated remaining_quantity
+                $newOrder->refresh();
             }
         }
     }
@@ -101,7 +104,9 @@ class TradingService
 
         $pricePerGram = $sellOrder->price_per_gram; // Seller's price
         $totalAmount = $quantity * $pricePerGram;
-        $commission = $this->commissionService->calculateCommission($quantity);
+
+        // Fixed: Pass both quantity and totalAmount to commission calculation
+        $commission = $this->commissionService->calculateCommission($quantity, $totalAmount);
 
         // Create transaction
         $this->transactionRepository->create([
@@ -119,15 +124,23 @@ class TradingService
         $buyer = $buyOrder->user;
         $seller = $sellOrder->user;
 
+        // Buyer receives gold
         $buyer->increment('gold_balance', $quantity);
+
+        // Seller receives money minus commission
+        // Note: Seller's gold was already deducted when order was placed
         $seller->increment('rial_balance', $totalAmount - $commission);
 
-        // Update orders
+        // Update orders remaining quantities
         $newRemainingBuy = $buyOrder->remaining_quantity - $quantity;
         $newRemainingSell = $sellOrder->remaining_quantity - $quantity;
 
         $this->orderRepository->updateRemainingQuantity($buyOrder->id, $newRemainingBuy);
         $this->orderRepository->updateRemainingQuantity($sellOrder->id, $newRemainingSell);
+
+        // Reload the orders to ensure fresh data
+        $buyOrder->refresh();
+        $sellOrder->refresh();
     }
 
     public function cancelOrder(int $orderId, int $userId): array
@@ -143,12 +156,14 @@ class TradingService
                 throw new \Exception('Order cannot be cancelled');
             }
 
-            // Refund balance
+            // Refund balance for remaining quantity
             $user = $order->user;
             if ($order->type === 'buy') {
+                // For buy orders: refund the reserved Rial for remaining quantity
                 $refundAmount = $order->remaining_quantity * $order->price_per_gram;
                 $user->increment('rial_balance', $refundAmount);
             } else {
+                // For sell orders: refund the reserved gold for remaining quantity
                 $user->increment('gold_balance', $order->remaining_quantity);
             }
 
