@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  unit-testing:
     runs-on: ubuntu-latest
 
     services:
@@ -70,7 +70,7 @@ jobs:
           REDIS_PORT: 6379
         run: php artisan migrate --force
 
-      - name: 🧪 Execute tests (Unit and Feature tests) via PHPUnit
+      - name: 🧪 Execute PHPUnit testing suite
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -89,9 +89,9 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
-  docker-test:
+  docker-validation:
     runs-on: ubuntu-latest
-    needs: test
+    needs: unit-testing
 
     steps:
       - name: 📥 Checkout code
@@ -100,31 +100,31 @@ jobs:
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 🔨 Build Docker images
-        run: docker-compose build --no-cache app
+      - name: 🔨 Build application container
+        run: docker compose build --no-cache app
 
-      - name: 🚀 Test Docker containers
+      - name: 🚀 Validate Docker environment
         run: |
-          docker-compose up -d mysql redis
+          docker compose up -d mysql redis
           sleep 20
-          docker-compose up -d app
+          docker compose up -d app
           sleep 30
-          # Test app container health
-          docker-compose exec -T app php --version
-          docker-compose exec -T app composer --version
-          # Test database connection
-          docker-compose exec -T app php artisan migrate:status || echo "Migration status check"
-          # Test Octane/Swoole
-          curl -f http://localhost:8000 || echo "Octane server test"
-          docker-compose down
+          # Verify container health
+          docker compose exec -T app php --version
+          docker compose exec -T app composer --version
+          # Check database connectivity
+          docker compose exec -T app php artisan migrate:status || echo "Migration status check"
+          # Verify Octane/Swoole server
+          curl -f http://localhost:8000 || echo "Octane server validation"
+          docker compose down
 
-      - name: 🧪 Run tests in Docker
+      - name: 🧪 Run application validation in Docker
         run: |
-          docker-compose up -d mysql redis
+          docker compose up -d mysql redis
           sleep 20
-          # Run tests inside Docker container
-          docker-compose run --rm app php artisan test
-          docker-compose down
+          # Execute validation inside Docker container
+          docker compose run --rm app php artisan test
+          docker compose down
 
   code-quality:
     runs-on: ubuntu-latest
