@@ -1,4 +1,4 @@
-<div dir="rtl">
+<div dir="rtl" style="font-family: Tahoma,serif;">
 
 # 🥇 سیستم معاملات طلا
 
@@ -16,8 +16,11 @@
 
 ## 🛠 تکنولوژی‌های استفاده شده
 
-- **Backend:** Laravel 10.x
-- **Database:** MySQL/SQLite
+- **Backend:** Laravel 10.x + Laravel Octane (Swoole)
+- **Database:** MySQL 8.0
+- **Cache:** Redis 7
+- **Web Server:** Nginx
+- **Containerization:** Docker & Docker Compose
 - **Testing:** PHPUnit
 - **Architecture:** Repository Pattern + Service Layer
 - **API:** RESTful API
@@ -25,12 +28,53 @@
 ## 📦 نصب و راه‌اندازی
 
 ### پیش‌نیازها
+- Docker & Docker Compose
+- Git
+
+**یا برای نصب محلی:**
 - PHP >= 8.2
 - Composer
 - MySQL
-- Git
+- Redis
 
-### مراحل نصب
+### 🐳 نصب با Docker (پیشنهادی)
+
+<div dir="ltr" style="font-family: 'Courier New', monospace;">
+
+```bash
+# Clone the project
+git clone https://github.com/alireza0xAhmadi/gold-trading-system
+cd gold-trading-system
+
+# Copy environment file
+cp .env.example .env
+
+# Build and start containers
+docker-compose up -d --build
+
+# Install dependencies inside container
+docker-compose exec app composer install
+
+# Generate App Key
+docker-compose exec app php artisan key:generate
+
+# Run migrations
+docker-compose exec app php artisan migrate
+
+# Run seeders (optional)
+docker-compose exec app php artisan db:seed
+```
+
+**دسترسی به سرویس‌ها:**
+- 🌐 Application: http://localhost (Nginx → Octane)
+- 📊 phpMyAdmin: http://localhost:8080
+- 🗄️ MySQL: localhost:3306
+- 📦 Redis: localhost:6379
+- ⚡ Octane Direct: http://localhost:8000
+
+</div>
+
+### 🔧 نصب محلی
 
 <div dir="ltr">
 
@@ -73,13 +117,22 @@ php artisan serve
 <div dir="ltr">
 
 ```bash
-# Run all tests
+# With Docker
+docker-compose exec app php artisan test
+
+# With Docker - Run specific tests
+docker-compose exec app php artisan test tests/Feature/TradingScenarioTest.php
+
+# With Docker - Run tests with detailed output
+docker-compose exec app php artisan test --verbose
+
+# Local installation
 php artisan test
 
-# Run specific tests
+# Local - Run specific tests
 php artisan test tests/Feature/TradingScenarioTest.php
 
-# Run tests with detailed output
+# Local - Run tests with detailed output
 php artisan test --verbose
 ```
 
@@ -90,6 +143,13 @@ php artisan test --verbose
 ### آدرس پایه
 
 ```
+# با Docker (از طریق Nginx)
+http://localhost/api/v1
+
+# دسترسی مستقیم به Octane
+http://localhost:8000/api/v1
+
+# نصب محلی
 http://localhost:8000/api/v1
 ```
 
