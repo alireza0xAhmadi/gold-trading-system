@@ -1,0 +1,28 @@
+parameters:
+    level: 5
+    paths:
+        - app
+        - config
+        - database
+        - routes
+        - tests
+
+    excludePaths:
+        - bootstrap/*
+        - storage/*
+        - vendor/*
+        - node_modules/*
+
+    ignoreErrors:
+        - '#Call to an undefined method App\\Models\\.*::[a-zA-Z0-9_]+\(\)#'
+        - '#Access to an undefined property App\\Models\\.*::\$[a-zA-Z0-9_]+#'
+        - '#Unsafe usage of new static\(\)#'
+
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+
+    bootstrapFiles:
+        - vendor/autoload.php
+
+    scanDirectories:
+        - vendor/laravel/framework
