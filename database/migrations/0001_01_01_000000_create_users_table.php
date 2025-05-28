@@ -10,14 +10,11 @@ class CreateUsersTable extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
-            $table->decimal('gold_balance', 10, 3)->default(0);
-            $table->bigInteger('rial_balance')->default(0); // ریال
-            $table->rememberToken();
-            $table->timestamps();
+            $table->string('name'); // user's full name
+            $table->string('email')->unique(); // unique email address
+            $table->decimal('gold_balance', 10, 3)->default(0); // gold balance in grams
+            $table->bigInteger('rial_balance')->default(0); // Rial balance (stored in IRR)
+            $table->timestamps(); // created_at & updated_at
         });
     }
 
