@@ -114,57 +114,17 @@ jobs:
 
       - name: 🚀 Validate Docker environment
         run: |
-          docker compose up -d mysql redis
-          sleep 30
-          # Wait for MySQL to be ready
-          until docker compose exec -T mysql mysqladmin ping -h"localhost" --silent; do
-            echo 'waiting for mysql...'
-            sleep 5
-          done
-          echo 'MySQL is ready!'
+          # Generate APP_KEY for the environment
+          APP_KEY=$(php -r "echo 'base64:'.base64_encode(random_bytes(32));")
+          echo "Generated APP_KEY: $APP_KEY"
 
-          # Start app container
-          docker compose up -d app
-          sleep 45
-
-          # Check if app container is running
-          if [ "$(docker compose ps -q app)" ]; then
-            echo "App container is running"
-            # Wait a bit more for the app to fully start
-            sleep 15
-            # Verify container health
-            docker compose exec -T app php --version || echo "PHP version check failed"
-            docker compose exec -T app composer --version || echo "Composer version check failed"
-            # Check if Octane is running
-            docker compose exec -T app php artisan octane:status || echo "Octane status check failed"
-          else
-            echo "App container failed to start"
-            docker compose logs app
-            exit 1
-          fi
-
-          docker compose down
-
-      - name: 🧪 Run application validation in Docker
-        run: |
-          # Ensure dependencies are available
-          composer install --prefer-dist --no-progress
-
-          docker compose up -d mysql redis
-          sleep 30
-          # Wait for MySQL to be ready
-          until docker compose exec -T mysql mysqladmin ping -h"localhost" --silent; do
-            echo 'waiting for mysql...'
-            sleep 5
-          done
-
-          # Create a temporary test environment file
-          echo "Creating test environment..."
-          cat > .env.testing << EOF
-          APP_NAME="Gold Trading Test"
-          APP_ENV=testing
-          APP_KEY=base64:$(openssl rand -base64 32)
+          # Create .env file with proper APP_KEY
+          cat > .env << EOF
+          APP_NAME="Gold Trading System"
+          APP_ENV=local
+          APP_KEY=$APP_KEY
           APP_DEBUG=true
+          APP_URL=http://localhost:8000
 
           DB_CONNECTION=mysql
           DB_HOST=mysql
@@ -176,15 +136,94 @@ jobs:
           REDIS_HOST=redis
           REDIS_PASSWORD=null
           REDIS_PORT=6379
+
+          OCTANE_SERVER=swoole
+          OCTANE_HOST=0.0.0.0
+          OCTANE_PORT=8000
+          OCTANE_WORKERS=4
+          EOF
+
+          docker compose up -d mysql redis
+          sleep 30
+          # Wait for MySQL to be ready
+          until docker compose exec -T mysql mysqladmin ping -h"localhost" --silent; do
+            echo 'waiting for mysql...'
+            sleep 5
+          done
+          echo 'MySQL is ready!'
+
+          # Start app container
+          docker compose up -d app
+          sleep 30
+
+          # Check container status more reliably
+          CONTAINER_STATUS=$(docker compose ps --format json | jq -r '.[] | select(.Service=="app") | .State')
+          echo "App container status: $CONTAINER_STATUS"
+
+          if [ "$CONTAINER_STATUS" = "running" ]; then
+            echo "App container is running successfully!"
+            # Simple health checks
+            docker compose exec -T app php --version
+            docker compose exec -T app composer --version
+            # Check if the application is responding
+            sleep 10
+            curl -f http://localhost:8000 || echo "HTTP check failed (this might be expected)"
+          else
+            echo "App container failed to start properly"
+            docker compose logs app
+            exit 1
+          fi
+
+          docker compose down
+
+      - name: 🧪 Run application validation in Docker
+        run: |
+          # Ensure dependencies are available
+          composer install --prefer-dist --no-progress
+
+          # Generate APP_KEY for testing
+          TEST_APP_KEY=$(php -r "echo 'base64:'.base64_encode(random_bytes(32));")
+
+          docker compose up -d mysql redis
+          sleep 30
+          # Wait for MySQL to be ready
+          until docker compose exec -T mysql mysqladmin ping -h"localhost" --silent; do
+            echo 'waiting for mysql...'
+            sleep 5
+          done
+
+          # Create a proper test environment file
+          echo "Creating test environment..."
+          cat > .env.testing << EOF
+          APP_NAME="Gold Trading Test"
+          APP_ENV=testing
+          APP_KEY=$TEST_APP_KEY
+          APP_DEBUG=true
+          APP_URL=http://localhost
+
+          DB_CONNECTION=mysql
+          DB_HOST=mysql
+          DB_PORT=3306
+          DB_DATABASE=gold_trading
+          DB_USERNAME=root
+          DB_PASSWORD=secret
+
+          REDIS_HOST=redis
+          REDIS_PASSWORD=null
+          REDIS_PORT=6379
+
+          CACHE_DRIVER=array
+          SESSION_DRIVER=array
+          QUEUE_CONNECTION=sync
           EOF
 
           # Run migrations and tests
           docker compose run --rm -e APP_ENV=testing app bash -c "
-            ls -la /var/www/html/vendor/ || echo 'vendor directory not found' &&
             cp .env.testing .env &&
-            php artisan key:generate --force &&
+            php artisan config:clear &&
+            php artisan cache:clear &&
             php artisan migrate --force &&
-            php artisan test --without-coverage
+            php artisan test --without-coverage --stop-on-failure
           "
 
           docker compose down
