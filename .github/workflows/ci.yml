@@ -221,8 +221,8 @@ jobs:
           docker compose run --rm -e APP_ENV=testing app bash -c "
             cp .env.testing .env &&
             php artisan config:clear &&
-            php artisan cache:clear &&
             php artisan migrate --force &&
+            php artisan config:cache &&
             php artisan test --without-coverage --stop-on-failure
           "
 
