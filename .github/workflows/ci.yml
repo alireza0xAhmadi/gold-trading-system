@@ -156,11 +156,8 @@ jobs:
           docker compose up -d app
           sleep 30
 
-          # Check container status more reliably
-          CONTAINER_STATUS=$(docker compose ps --format json | jq -r '.[] | select(.Service=="app") | .State')
-          echo "App container status: $CONTAINER_STATUS"
-
-          if [ "$CONTAINER_STATUS" = "running" ]; then
+          # Check container status simply
+          if docker compose ps app | grep -q "Up"; then
             echo "App container is running successfully!"
             # Simple health checks
             docker compose exec -T app php --version
@@ -170,6 +167,9 @@ jobs:
             curl -f http://localhost:8000 || echo "HTTP check failed (this might be expected)"
           else
             echo "App container failed to start properly"
+            echo "Container status:"
+            docker compose ps app
+            echo "Container logs:"
             docker compose logs app
             exit 1
           fi
