@@ -116,16 +116,18 @@ jobs:
 
           # Start app container
           docker compose up -d app
-          sleep 20
+          sleep 45
 
           # Check if app container is running
           if [ "$(docker compose ps -q app)" ]; then
             echo "App container is running"
+            # Wait a bit more for the app to fully start
+            sleep 15
             # Verify container health
             docker compose exec -T app php --version || echo "PHP version check failed"
             docker compose exec -T app composer --version || echo "Composer version check failed"
-            # Check database connectivity
-            docker compose exec -T app php artisan migrate:status || echo "Migration status check failed"
+            # Check if Octane is running
+            docker compose exec -T app php artisan octane:status || echo "Octane status check failed"
           else
             echo "App container failed to start"
             docker compose logs app
@@ -144,11 +146,35 @@ jobs:
             sleep 5
           done
 
-          # Run migrations first
-          docker compose run --rm app php artisan migrate --force
+          # Create a temporary test environment file
+          echo "Creating test environment..."
+          cat > .env.testing << EOF
+          APP_NAME="Gold Trading Test"
+          APP_ENV=testing
+          APP_KEY=base64:$(openssl rand -base64 32)
+          APP_DEBUG=true
 
-          # Execute tests inside Docker container
-          docker compose run --rm app php artisan test --without-coverage
+          DB_CONNECTION=mysql
+          DB_HOST=mysql
+          DB_PORT=3306
+          DB_DATABASE=gold_trading
+          DB_USERNAME=root
+          DB_PASSWORD=secret
+
+          REDIS_HOST=redis
+          REDIS_PASSWORD=null
+          REDIS_PORT=6379
+          EOF
+
+          # Run migrations and tests
+          docker compose run --rm -e APP_ENV=testing app bash -c "
+            composer install --no-interaction --prefer-dist &&
+            cp .env.testing .env &&
+            php artisan key:generate --force &&
+            php artisan migrate --force &&
+            php artisan test --without-coverage
+          "
+
           docker compose down
 
   code-quality:

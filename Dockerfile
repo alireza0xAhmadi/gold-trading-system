@@ -33,17 +33,33 @@ WORKDIR /var/www/html
 
 FROM base as development
 
+# Copy composer files first
 COPY composer.json composer.lock ./
-RUN composer install --no-scripts --no-autoloader
 
+# Install dependencies
+RUN composer install --no-scripts --no-autoloader --no-dev=false
+
+# Copy all source code
 COPY . .
+
+# Complete the composer setup
 RUN composer dump-autoload --optimize
 
+# Set permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
+# Create .env from example if not exists
+RUN cp .env.example .env || echo ".env already exists"
+
+# Generate app key (this will be overridden by environment variables)
+RUN php artisan key:generate || echo "Key generation skipped"
+
 EXPOSE 8000 9501
+
+# Use a startup script instead of direct command
+CMD ["sh", "-c", "composer install && php artisan key:generate --force && php artisan config:cache && php artisan octane:start --server=swoole --host=0.0.0.0 --port=8000"]
 
 FROM base as production
 
