@@ -223,7 +223,7 @@ jobs:
             php artisan config:clear &&
             php artisan migrate --force &&
             php artisan config:cache &&
-            php artisan test --without-coverage --stop-on-failure
+            php artisan test --stop-on-failure
           "
 
           docker compose down
